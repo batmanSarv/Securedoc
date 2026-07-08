@@ -6,7 +6,7 @@ Secure any file with a password — constant memory footprint, defence‑grade c
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Language: C++17](https://img.shields.io/badge/C%2B%2B-17-blue.svg)](https://en.cppreference.com/w/cpp/17)
-[![Status: v1.0](https://img.shields.io/badge/version-1.0-green.svg)](https://github.com/YOUR_USERNAME/securdoc/releases)
+[![Status: v1.0](https://img.shields.io/badge/version-1.0-green.svg)](https://github.com/batmanSarv/securdoc/releases)
 
 ---
 
@@ -42,7 +42,7 @@ sudo apt update
 sudo apt install libsodium-dev
 
 # Clone and build
-git clone https://github.com/YOUR_USERNAME/securdoc.git
+git clone https://github.com/batmanSarv/securdoc.git
 cd securdoc
 g++ -std=c++17 -O2 -Wall src/securdoc.cpp -o securdoc -lsodium
 # Linux (Fedora)

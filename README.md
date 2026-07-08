@@ -33,22 +33,53 @@ Most encryption tools load entire files into memory – a 2GB video can crash yo
 ---
 
 ## Build
+- C++17 compiler: GCC ≥ 8, Clang ≥ 7, or MSVC 2019+
+- libsodium ≥ 1.0.18 – the only external dependency
+- CMake (optional, for multi‑platform builds)
 
-### Prerequisites
-- **C++17 compiler** (GCC 8+ or Clang 7+)
-- **libsodium** (≥ 1.0.18)
+# Install libsodium development files
+sudo apt update
+sudo apt install libsodium-dev
 
-### Linux / macOS / Raspberry Pi
-bash
-sudo apt install libsodium-dev   # Debian/Ubuntu
-brew install libsodium           # macOS
-## Usage
-# Encrypt a file (interactive password)
+# Clone and build
+git clone https://github.com/YOUR_USERNAME/securdoc.git
+cd securdoc
+g++ -std=c++17 -O2 -Wall src/securdoc.cpp -o securdoc -lsodium
+# Linux (Fedora)
+sudo dnf install libsodium-devel
+g++ -std=c++17 -O2 -Wall src/securdoc.cpp -o securdoc -lsodium
+# Raspberry Pi (Raspberry Pi OS)
+sudo apt install libsodium-dev
+g++ -std=c++17 -O2 -Wall src/securdoc.cpp -o securdoc -lsodium
+
+
+# Usage
+###Encrypt a file (interactive password)
 ./securdoc encrypt --in secret.pdf --out secret.sdoc
 
-# Decrypt
+###Decrypt
 ./securdoc decrypt --in secret.sdoc --out restored.pdf
 
-# Provide password via command line (for scripting)
+###Provide password via command line (for scripting)
 ./securdoc encrypt --in data.bin --out data.sdoc --pass "p4ssw0rd"
+
+#Internal Process (what happens when you run the command)
+##Encryption:
+
+1. A cryptographically random 16‑byte salt is generated.
+2. Argon2id stretches the password + salt into a 256‑bit key (default: 64 MB memory, 3 iterations).
+3. The .sdoc header (magic, version, salt, stream nonce) is written to the output file.
+4. The input file is read in 1024‑byte chunks. Each chunk is encrypted with XChaCha20‑Poly1305 and written to the output. A 17‑byte Poly1305 authentication tag is appended to every chunk.
+5. The final chunk is marked with TAG_FINAL so the decryptor knows exactly where the data ends.
+
+##Decryption:
+
+1. The .sdoc header is read and validated — magic must be SDOC, version must be 1.
+2. The salt is extracted; the same Argon2id parameters re‑derive the key from the password.
+3. The encrypted stream is read chunk‑by‑chunk. libsodium automatically verifies each chunk’s MAC.
+4. If any byte has been tampered with, decryption immediately stops with an error.
+5. If all chunks are valid, the original plaintext is restored byte‑for‑byte.
+
+<img width="930" height="498" alt="cli" src="https://github.com/user-attachments/assets/e10fe2b1-2bf5-4a7f-b7d6-3c35715b4500" />
+
 

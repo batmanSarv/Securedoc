@@ -54,17 +54,17 @@ g++ -std=c++17 -O2 -Wall src/securdoc.cpp -o securdoc -lsodium
 
 
 # Usage
-###Encrypt a file (interactive password)
+### Encrypt a file (interactive password)
 ./securdoc encrypt --in secret.pdf --out secret.sdoc
 
-###Decrypt
+### Decrypt
 ./securdoc decrypt --in secret.sdoc --out restored.pdf
 
-###Provide password via command line (for scripting)
+### Provide password via command line (for scripting)
 ./securdoc encrypt --in data.bin --out data.sdoc --pass "p4ssw0rd"
 
-#Internal Process (what happens when you run the command)
-##Encryption:
+# Internal Process (what happens when you run the command)
+## Encryption:
 
 1. A cryptographically random 16‑byte salt is generated.
 2. Argon2id stretches the password + salt into a 256‑bit key (default: 64 MB memory, 3 iterations).
@@ -72,7 +72,7 @@ g++ -std=c++17 -O2 -Wall src/securdoc.cpp -o securdoc -lsodium
 4. The input file is read in 1024‑byte chunks. Each chunk is encrypted with XChaCha20‑Poly1305 and written to the output. A 17‑byte Poly1305 authentication tag is appended to every chunk.
 5. The final chunk is marked with TAG_FINAL so the decryptor knows exactly where the data ends.
 
-##Decryption:
+## Decryption:
 
 1. The .sdoc header is read and validated — magic must be SDOC, version must be 1.
 2. The salt is extracted; the same Argon2id parameters re‑derive the key from the password.
@@ -80,6 +80,7 @@ g++ -std=c++17 -O2 -Wall src/securdoc.cpp -o securdoc -lsodium
 4. If any byte has been tampered with, decryption immediately stops with an error.
 5. If all chunks are valid, the original plaintext is restored byte‑for‑byte.
 
+### Example
 <img width="930" height="498" alt="cli" src="https://github.com/user-attachments/assets/e10fe2b1-2bf5-4a7f-b7d6-3c35715b4500" />
 
 

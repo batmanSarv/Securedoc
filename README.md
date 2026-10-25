@@ -1,86 +1,144 @@
 # SecurDoc
 
-### Streaming Authenticated File Encryption Engine in C++17
+**Streaming authenticated file encryption in C++17**
 
-Secure any file with a password — constant memory footprint, defence‑grade cryptography, and a self‑contained binary container.
-
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Language: C++17](https://img.shields.io/badge/C%2B%2B-17-blue.svg)](https://en.cppreference.com/w/cpp/17)
-[![Status: v1.0](https://img.shields.io/badge/version-1.0-green.svg)](https://github.com/batmanSarv/securdoc/releases)
-
----
+Encrypt any file with a password. Data is processed in small chunks, so memory use stays flat regardless of file size, and the output is a self-describing `.sdoc` container.
 
 ## Why SecurDoc?
 
-Most encryption tools load entire files into memory – a 2GB video can crash your system. SecurDoc reads, encrypts, and writes in small chunks, keeping RAM usage under **2 MB** regardless of file size. It's built for:
+Many simple encryption tools read the whole file into memory, which fails on multi-gigabyte inputs. SecurDoc reads, encrypts, and writes chunk by chunk. Use cases:
 
-- **Secure file sharing** – encrypt a file, send the `.sdoc` container, and only someone with the password can recover the original.
-- **Embedded telemetry security** – the same engine runs on a Raspberry Pi or Jerry 2.0 drone to encrypt sensor data before transmission.
+- **Secure file sharing:** encrypt a file, send the `.sdoc`, and only someone with the password can recover the original.
+- **Embedded telemetry:** the same engine is intended for a Raspberry Pi or the Jerry 2.0 UGV to encrypt sensor data before transmission.
 
----
+> SecurDoc is a learning and portfolio project built on libsodium. It has not been independently audited. Do not rely on it for high-stakes data.
 
 ## Features
 
-- 🧠 **Memory‑safe streaming** – 4KB buffers, zero dynamic allocation in the hot path
-- 🔐 **Argon2id key derivation** – configurable memory/time cost, resistant to GPU brute‑force
-- 🛡️ **XChaCha20‑Poly1305 authenticated encryption** – via `libsodium`, misuse‑resistant API
-- 📦 **Custom `.sdoc` binary container** – magic bytes, versioning, salt, and stream nonce
-- 🖥️ **Unified CLI** – single executable for encryption and decryption
-- 👁️ **Hidden password entry** – no shell history leaks, cross‑platform
-- 📊 **Live progress bar** – for multi‑gigabyte files
-- 🧵 **RAII & stack buffers** – deterministic, leak‑free operation
+- **Streaming encryption:** fixed-size stack buffers, no per-file allocation, files of any size
+- **Argon2id key derivation:** 64 MiB memory, 3 passes, random 16-byte salt per file
+- **XChaCha20-Poly1305 authenticated encryption:** via libsodium's `crypto_secretstream` API; every chunk is authenticated and the final chunk is tagged, so truncation is detected
+- **`.sdoc` container:** 46-byte header (magic, version, salt, stream header) followed by the encrypted stream
+- **Single CLI:** one executable for `encrypt` and `decrypt`
+- **Hidden password prompt:** echo disabled on Linux/macOS and Windows
 
----
+## Memory behavior
+
+Argon2id deliberately uses 64 MiB during key derivation. After that, encryption and decryption run in constant memory using 1 KiB plaintext chunks, independent of file size.
+
+## Project structure
+
+```text
+securedoc/
+├── docs/
+├── include/securdoc/
+│   ├── crypto.h        # Argon2id + secretstream wrappers
+│   └── header.h        # .sdoc header definition (46 bytes, packed)
+├── src/
+│   ├── crypto.cpp      # libsodium calls
+│   ├── header.cpp      # header read / write / validate
+│   └── securedoc.cpp   # CLI, password prompt, encrypt / decrypt loops
+├── CMakeLists.txt
+└── README.md
+```
 
 ## Build
-- C++17 compiler: GCC ≥ 8, Clang ≥ 7, or MSVC 2019+
-- libsodium ≥ 1.0.18 – the only external dependency
-- CMake (optional, for multi‑platform builds)
 
-# Install libsodium development files
-sudo apt update
+Requirements: a C++17 compiler (GCC 8+, Clang 7+, or MSVC 2019+), libsodium 1.0.18 or newer, and CMake 3.10+ (optional).
+
+Install libsodium:
+
+```bash
+# Debian / Ubuntu / Raspberry Pi OS
 sudo apt install libsodium-dev
-
-# Clone and build
-git clone https://github.com/batmanSarv/securdoc.git
-cd securdoc
-g++ -std=c++17 -O2 -Wall src/securdoc.cpp -o securdoc -lsodium
-# Linux (Fedora)
+# Fedora
 sudo dnf install libsodium-devel
-g++ -std=c++17 -O2 -Wall src/securdoc.cpp -o securdoc -lsodium
-# Raspberry Pi (Raspberry Pi OS)
-sudo apt install libsodium-dev
-g++ -std=c++17 -O2 -Wall src/securdoc.cpp -o securdoc -lsodium
+# Arch
+sudo pacman -S libsodium
+```
 
+Build with CMake:
 
-# Usage
-### Encrypt a file (interactive password)
+```bash
+git clone https://github.com/batmanSarv/Securedoc.git
+cd Securedoc
+cmake -B build
+cmake --build build
+```
+
+Or build directly with g++:
+
+```bash
+g++ -std=c++17 -O2 -Wall -Iinclude src/*.cpp -o securdoc -lsodium
+```
+
+Linux is the primary tested platform. Windows (MSYS2) and macOS builds are expected to work but are not covered by CI.
+
+## Usage
+
+```bash
+# Encrypt (password is prompted, input is hidden)
 ./securdoc encrypt --in secret.pdf --out secret.sdoc
 
-### Decrypt
+# Decrypt
 ./securdoc decrypt --in secret.sdoc --out restored.pdf
+```
 
-### Provide password via command line (for scripting)
-./securdoc encrypt --in data.bin --out data.sdoc --pass "p4ssw0rd"
-
-# Internal Process (what happens when you run the command)
-## Encryption:
-
-1. A cryptographically random 16‑byte salt is generated.
-2. Argon2id stretches the password + salt into a 256‑bit key (default: 64 MB memory, 3 iterations).
-3. The .sdoc header (magic, version, salt, stream nonce) is written to the output file.
-4. The input file is read in 1024‑byte chunks. Each chunk is encrypted with XChaCha20‑Poly1305 and written to the output. A 17‑byte Poly1305 authentication tag is appended to every chunk.
-5. The final chunk is marked with TAG_FINAL so the decryptor knows exactly where the data ends.
-
-## Decryption:
-
-1. The .sdoc header is read and validated — magic must be SDOC, version must be 1.
-2. The salt is extracted; the same Argon2id parameters re‑derive the key from the password.
-3. The encrypted stream is read chunk‑by‑chunk. libsodium automatically verifies each chunk’s MAC.
-4. If any byte has been tampered with, decryption immediately stops with an error.
-5. If all chunks are valid, the original plaintext is restored byte‑for‑byte.
+Passing `--pass "<password>"` is supported for scripting, but the password is then visible in the process list and shell history. Prefer the interactive prompt.
 
 ### Example
-<img width="930" height="498" alt="cli" src="https://github.com/user-attachments/assets/e10fe2b1-2bf5-4a7f-b7d6-3c35715b4500" />
 
+```text
+$ ./securdoc encrypt --in notes.txt --out notes.sdoc
+Password: ********
+[SecurDoc] Encryption complete.
 
+$ ./securdoc decrypt --in notes.sdoc --out notes_restored.txt
+Password: ********
+[SecurDoc] Decryption complete.
+
+$ cmp notes.txt notes_restored.txt && echo identical
+identical
+```
+
+A wrong password, a modified byte, or a truncated file makes decryption fail with an error and no output file is kept.
+
+## How it works
+
+**Encryption**
+
+1. Generate a random 16-byte salt.
+2. Derive a 256-bit key from the password and salt with Argon2id (64 MiB, 3 iterations).
+3. Initialize a libsodium secretstream and write the 46-byte header to the output.
+4. Read the input in 1024-byte chunks. Each chunk is encrypted and written with a 17-byte authentication overhead.
+5. Mark the last chunk `TAG_FINAL` so the decryptor knows where the data ends.
+
+**Decryption**
+
+1. Read and validate the header (magic `SDOC`, version 1).
+2. Re-derive the key from the password and the stored salt.
+3. Decrypt chunk by chunk; libsodium verifies each chunk's authentication tag.
+4. Any modified chunk stops decryption with an error. Missing the `TAG_FINAL` chunk is treated as truncation.
+5. If every chunk verifies and the final tag is seen, the original plaintext is restored byte for byte.
+
+## `.sdoc` header layout
+
+| Offset | Size | Field |
+|-------:|-----:|-------|
+| 0 | 4 | Magic `SDOC` |
+| 4 | 2 | Version (`1`) |
+| 6 | 16 | Argon2id salt |
+| 22 | 24 | secretstream header |
+
+Total: 46 bytes, followed by the encrypted chunks.
+
+## Limitations
+
+- Argon2id parameters are fixed in code, not stored in the header.
+- The header is not yet authenticated as associated data.
+- No automated tests or CI yet.
+- Not audited.
+
+## License
+
+Released under the [MIT License](LICENSE). Copyright (c) 2026 Sarvesh.

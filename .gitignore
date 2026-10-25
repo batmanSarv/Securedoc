@@ -1,0 +1,4 @@
+build/
+*.sdoc
+test_files/
+.zed/
